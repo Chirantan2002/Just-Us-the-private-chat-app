@@ -64,7 +64,116 @@ npm run dev      # start Next.js development server
 The app will be available at `http://localhost:3000`.
 
 
-## 📁 Project Structure
+## 🏗️ Project Workflow Diagram
+
+```mermaid
+flowchart LR
+
+    %% Users
+    U1["User A"]
+    U2["User B"]
+
+    %% Frontend
+    FE["Next.js Frontend
+    (App Router + React Query)"]
+
+    %% API Layer
+    API["Elysia API
+    Route Handlers"]
+
+    %% Auth
+    AUTH["Token Auth
+    Cookie Validation"]
+
+    %% Redis
+    REDIS["Upstash Redis
+    Room & Message Storage"]
+
+    %% Realtime
+    RT["Upstash Realtime
+    Pub/Sub"]
+
+    %% Room Creation
+    U1 -->|"Create Room"| FE
+    U2 -->|"Join Room"| FE
+
+    FE -->|"POST /create-room"| API
+    FE -->|"POST /join-room"| API
+
+    API --> AUTH
+    AUTH --> API
+
+    API -->|"Create room metadata"| REDIS
+    API -->|"Validate room capacity ≤ 2"| REDIS
+
+    %% Messaging Flow
+    U1 -->|"Send Message"| FE
+    FE -->|"POST /message"| API
+
+    API -->|"Persist message"| REDIS
+    API -->|"Publish event"| RT
+
+    RT -->|"Realtime update"| FE
+
+    FE -->|"Display message"| U1
+    FE -->|"Display message"| U2
+
+    %% Room Loading
+    FE -->|"GET room history"| API
+    API --> REDIS
+    REDIS --> API
+    API --> FE
+
+    %% Cleanup
+    REDIS -->|"TTL 600s"| CLEANUP["Auto Expiry"]
+```
+
+## 🛠️ Sequence Diagram
+
+#### Showing what happens when two users chat:
+
+```mermaid
+sequenceDiagram
+
+    participant A as User A
+    participant F as Next.js Frontend
+    participant E as Elysia API
+    participant R as Upstash Redis
+    participant RT as Upstash Realtime
+    participant B as User B
+
+    A->>F: Create Room
+    F->>E: POST /create-room
+    E->>R: Store room metadata
+    R-->>E: Room ID
+    E-->>F: Room ID
+    F-->>A: Share room link
+
+    B->>F: Join Room
+    F->>E: POST /join-room
+    E->>R: Validate room
+    E-->>F: Joined
+
+    A->>F: Send message
+    F->>E: POST /message
+    E->>R: Save message
+    E->>RT: Publish event
+
+    RT-->>F: Realtime update
+    F-->>B: New message appears
+
+    B->>F: Send reply
+    F->>E: POST /message
+    E->>R: Save reply
+    E->>RT: Publish event
+
+    RT-->>F: Realtime update
+    F-->>A: New message appears
+
+    Note over R: Room expires after 10 minutes of inactivity
+```
+
+## 📁 Project Directory Structure
 
 ```
 ├── src/ 
